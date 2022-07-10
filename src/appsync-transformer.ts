@@ -103,12 +103,6 @@ export interface AppSyncTransformerProps {
   readonly dynamoDbStreamConfig?: { [name: string]: StreamViewType };
 
   /**
-   * Specify a custom nested stack name
-   * @default "appsync-nested-stack"
-   */
-  readonly nestedStackName?: string;
-
-  /**
    * The root directory to use for finding custom resolvers
    * @default process.cwd()
    */
@@ -151,11 +145,6 @@ export class AppSyncTransformer extends Construct {
    * The cdk GraphqlApi construct
    */
   public readonly appsyncAPI: GraphqlApi;
-
-  /**
-   * The NestedStack that contains the AppSync resources
-   */
-  public readonly nestedAppsyncStack: NestedStack;
 
   /**
    * Map of cdk table tokens to table names
@@ -263,10 +252,8 @@ export class AppSyncTransformer extends Construct {
 
     this.resolvers = resolvers;
 
-    this.nestedAppsyncStack = new NestedStack(this, props.nestedStackName ?? 'appsync-nested-stack');
-
     // AppSync
-    this.appsyncAPI = new GraphqlApi(this.nestedAppsyncStack, `${id}-api`, {
+    this.appsyncAPI = new GraphqlApi(this, `${id}-api`, {
       name: props.apiName ? props.apiName : `${id}-api`,
       authorizationConfig: props.authorizationConfig
         ? props.authorizationConfig
@@ -336,7 +323,7 @@ export class AppSyncTransformer extends Construct {
     Object.keys(noneResolvers).forEach((resolverKey) => {
       const resolver = resolvers[resolverKey];
       new Resolver(
-        this.nestedAppsyncStack,
+        this,
         `${resolver.typeName}-${resolver.fieldName}-resolver`,
         {
           api: this.appsyncAPI,
@@ -408,7 +395,7 @@ export class AppSyncTransformer extends Construct {
       tableData[tableKey].resolvers.forEach((resolverKey) => {
         const resolver = resolvers[resolverKey];
         new Resolver(
-          this.nestedAppsyncStack,
+          this,
           `${resolver.typeName}-${resolver.fieldName}-resolver`,
           {
             api: this.appsyncAPI,
@@ -429,7 +416,7 @@ export class AppSyncTransformer extends Construct {
       tableData[tableKey].gsiResolvers.forEach((resolverKey) => {
         const resolver = resolvers.gsi[resolverKey];
         new Resolver(
-          this.nestedAppsyncStack,
+          this,
           `${resolver.typeName}-${resolver.fieldName}-resolver`,
           {
             api: this.appsyncAPI,
@@ -472,7 +459,7 @@ export class AppSyncTransformer extends Construct {
     };
 
     const table = new Table(
-      this.nestedAppsyncStack,
+      this,
       tableData.tableName,
       tableProps,
     );
@@ -567,7 +554,7 @@ export class AppSyncTransformer extends Construct {
 
       httpResolvers.forEach((resolver: CdkTransformerHttpResolver) => {
         new Resolver(
-          this.nestedAppsyncStack,
+          this,
           `${resolver.typeName}-${resolver.fieldName}-resolver`,
           {
             api: this.appsyncAPI,
@@ -594,7 +581,7 @@ export class AppSyncTransformer extends Construct {
   private getResourcesFromGeneratedRolePolicy(policy?: Resource): string[] {
     if (!policy?.Properties?.PolicyDocument?.Statement) return [];
 
-    const { region, account } = this.nestedAppsyncStack;
+    const { region, account } = this;
 
     const resolvedResources: string[] = [];
     for (const statement of policy.Properties.PolicyDocument.Statement) {
@@ -635,7 +622,7 @@ export class AppSyncTransformer extends Construct {
 
     for (const resolver of this.functionResolvers[functionName]) {
       new Resolver(
-        this.nestedAppsyncStack,
+        this,
         `${resolver.typeName}-${resolver.fieldName}-resolver`,
         {
           api: this.appsyncAPI,
@@ -678,7 +665,7 @@ export class AppSyncTransformer extends Construct {
    * @param props
    */
   public overrideResolver(props: OverrideResolverProps) {
-    const resolver = this.nestedAppsyncStack.node.tryFindChild(`${props.typeName}-${props.fieldName}-resolver`) as Resolver;
+    const resolver = this.node.tryFindChild(`${props.typeName}-${props.fieldName}-resolver`) as Resolver;
     if (!resolver) throw new Error(`Resolver with typeName '${props.typeName}' and fieldName '${props.fieldName}' not found`);
 
     const cfnResolver = resolver.node.defaultChild as CfnResolver;
